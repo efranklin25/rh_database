@@ -171,12 +171,12 @@ def af_update_crawl(collection, af_source, origin, special, contact):
 		if {"_id":each_link} in current_DB:
 			crawlList.remove(each_link)
 
-	for listing in currentDB: # Removes Listings from DB that are not currently listed on Chinook's Website
-		if listing["_id"] in newList:
+	for listing in current_DB: # Removes Listings from DB that are not currently listed on Chinook's Website
+		if listing["_id"] in new_list:
 			pass
 		else:
 			removeCount = removeCount + 1
-			collection.remove(listing)
+			collection.remove({"_id": listing["_id"]})
 
 	# af_crawl(listing_URL, origin, special, contact):
 	for link in crawlList:
