@@ -169,20 +169,21 @@ def af_update_crawl(collection, af_source, origin, special, contact):
 
 	for each_link in new_list: # Remove Listings from new list to crawl that I already have in the DB
 		if {"_id":each_link} in current_DB:
-			crawlList.remove(each_link)
+			crawlList.delete_one(each_link)
 
 	for listing in current_DB: # Removes Listings from DB that are not currently listed on Chinook's Website
 		if listing["_id"] in new_list:
 			pass
 		else:
 			removeCount = removeCount + 1
-			collection.remove({"_id": listing["_id"]})
+			collection.delete_one({"_id": listing["_id"]})
 
 	# af_crawl(listing_URL, origin, special, contact):
+	# May want to use insert_many() **new in mongo 3.0....
 	for link in crawlList:
 		try:
 			INSERTME = af_crawl(link, origin, special, contact)
-			collection.insert(INSERTME)
+			collection.insert_one(INSERTME)
 			newCount = newCount + 1
 		except pymongo.errors.DuplicateKeyError:
 			pass
