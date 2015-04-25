@@ -39,24 +39,24 @@ def get_type(description_string):
 	return listing_type
 
 def is_pet_ok(description, amenity_list):
-    #Returns dictionary of dogs and cats with values as integers, respresenting either: 0 = No, 1 = Yes, 2 = Unspecified("Contact for Information")
+    #Returns dictionary of dogs and cats with values as integers, respresenting either: 2 = No, 1 = Yes, 0 = Unspecified("Contact for Information")
     no_pet = ['NO PET', 'NO PETS', 'NOT ACCEPT PETS', 'NOT ACCEPT PET', 'PETS ARE NOT', 'PET IS NOT']
     yes_dog = ['DOGS ALLOWED', 'DOG ALLOWED', 'DOGS ONLY', 'DOG ONLY', 'DOGS PERMITTED', 'DOG PERMITTED', '1 DOG', 'ONE DOG']
     yes_cat = ['CATS ALLOWED', 'CAT ALLOWED', 'CATS ONLY', 'CAT ONLY', 'CATS PERMITTED', 'CAT PERMITTED', '1 CAT', 'ONE CAT']
     yes_pet = ['PETS ALLOWED', 'PET ALLOWED', 'CATS AND DOGS ALLOWED', 'CATS & DOGS ALLOWED', 'PETS PERMITTED', 'PET PERMITTED']
     
-    pets = {"dogs" : 2, "cats" : 2}
+    pets = {"dogs" : 0, "cats" : 0}
 
     for keyword in no_pet:
         if keyword in description.upper():
-            pets['dogs'] = 0
-            pets['cats'] = 0
+            pets['dogs'] = 2
+            pets['cats'] = 2
             return pets
         else:
             for amenity in amenity_list:
                 if keyword in amenity.upper():
-                    pets['dogs'] = 0
-                    pets['cats'] = 0
+                    pets['dogs'] = 2
+                    pets['cats'] = 2
                     return pets
 
     for keyword in yes_pet:
@@ -74,25 +74,25 @@ def is_pet_ok(description, amenity_list):
     for keyword in yes_dog:
         if keyword in description.upper():
             pets['dogs'] = 1
-            pets['cats'] = 0
+            pets['cats'] = 2
             return pets
         else:
             for amenity in amenity_list:
                 if keyword in amenity.upper():
                     pets['dogs'] = 1
-                    pets['cats'] = 0
+                    pets['cats'] = 2
                     return pets
 
     for keyword in yes_cat:
         if keyword in description.upper():
             pets['cats'] = 1
-            pets['dogs'] = 0
+            pets['dogs'] = 2
             return pets
         else:
             for amenity in amenity_list:
                 if keyword in amenity.upper():
                     pets['cats'] = 1
-                    pets['dogs'] = 0
+                    pets['dogs'] = 2
                     return pets
 
     return pets
@@ -200,7 +200,7 @@ def get_location(address_string):
         "state": state,
         "zip_code": zip_code,
         "county": county,
-        "address": address,
+        "address": address.replace('#', 'Unit ')
     }
 
     return location

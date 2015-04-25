@@ -26,9 +26,9 @@ def af_crawl(listing_URL, origin, special, contact):
 	soupStrings = soup.find_all(text=True)
 
 	jsonDoc = {}
-	jsonDoc["_id"] = listing_URL
+	jsonDoc["URL"] = listing_URL
 	jsonDoc["origin"] = origin
-	jsonDoc["title"] = str(soup.find("h1",class_="align_left").string)
+	jsonDoc["title"] = str(soup.find("h1",class_="align_left").string).strip()
 
 	#get rental cost as integer, removing comma if present in value
 	try:
@@ -43,7 +43,7 @@ def af_crawl(listing_URL, origin, special, contact):
 		else:
 			costInt = 0
 	if costInt == 0:
-		return {"_id": listing_URL, "origin": origin}
+		return {"URL": listing_URL, "origin": origin}
 	jsonDoc["cost"] = costInt
 
 	# number of days between payments, 30 = monthly, 7 = weekly etc
@@ -67,6 +67,8 @@ def af_crawl(listing_URL, origin, special, contact):
 	imageList = []
 	for link in imageObject:
 		imageList.append(link.get('href'))
+	if imageList == []:
+		imageList.append("/static/house.png")
 	jsonDoc["images"] = imageList
 
 	#returns list of strings, the listed amenities on the given listing
@@ -157,7 +159,7 @@ def af_crawl(listing_URL, origin, special, contact):
 
 def af_update_crawl(collection, af_source, origin, special, contact):
 	new_list = af_links(af_source)
-	currentDB = collection.find({"origin":origin},{"_id":1})
+	currentDB = collection.find({"origin":origin},{"URL":1})
 	crawlList = copy.copy(new_list) ##going to crawl crawlList after it has been modified
 
 	newCount = 0
@@ -168,15 +170,15 @@ def af_update_crawl(collection, af_source, origin, special, contact):
 		current_DB.append(item)
 
 	for each_link in new_list: # Remove Listings from new list to crawl that I already have in the DB
-		if {"_id":each_link} in current_DB:
+		if {"URL":each_link} in current_DB:
 			crawlList.delete_one(each_link)
 
 	for listing in current_DB: # Removes Listings from DB that are not currently listed on Chinook's Website
-		if listing["_id"] in new_list:
+		if listing["URL"] in new_list:
 			pass
 		else:
 			removeCount = removeCount + 1
-			collection.delete_one({"_id": listing["_id"]})
+			collection.delete_one({"URL": listing["URL"]})
 
 	# af_crawl(listing_URL, origin, special, contact):
 	# May want to use insert_many() **new in mongo 3.0....
