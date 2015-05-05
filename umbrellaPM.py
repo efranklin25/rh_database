@@ -3,160 +3,42 @@ from bs4 import BeautifulSoup
 from listing_tools import get_type, get_location, is_student, is_pet_ok, lease_type
 import pymongo
 import json
-from pprint import pprint
-
-
+from serverConfig import collection
+import copy
 
 req_url = "http://umbrellaproperties.com/wordpress/wp-admin/admin-ajax.php"
 req_data = "action=wpp_property_overview_pagination&%5Bpagination%5B=off&wpp_ajax_query%5Bquery%5D%5Bproperty_type%5D=floorplan&wpp_ajax_query%5Bthumbnail_size%5D=thumbnail"
 
-def get_page_listings(url, form_data):
-	req = urllib2.Request(url, form_data)
-	response = urllib2.urlopen(req).read()
-	doc = json.JSONDecoder().decode(response[response.index('{'):])
-	current_list = []
+def umbrella_pm():
+	origin = "umbrellaPM"
+	special = {"section8" : False, "hacsa" : False}
+	contact = {
+			"name" : "Umbrella Property Managerment",
+			"address" : "91120 N. Willamette, Coburg, OR 97408",
+			"phone" : "(541) 484-6595",
+			"fax" : "(541) 484-4395",
+			"email" : "N/A",
+			"hours" : "Monday-Friday 8:30 AM - 5PM"
+		}
 
-	the_soup = BeautifulSoup(doc["display"])
+	def get_page_listings(url, form_data):
+		req = urllib2.Request(url, form_data)
+		response = urllib2.urlopen(req).read()
+		doc = json.JSONDecoder().decode(response[response.index('{'):])
+		current_list = []
+		the_soup = BeautifulSoup(doc["display"])
 
-	get_links = the_soup.find_all("a", rel="properties")
+		get_links = the_soup.find_all("a", rel="properties")
 
-	for link in get_links:
-		var = link.get('href')
-		current_list.append(var)
+		for link in get_links:
+			var = link.get('href')
+			current_list.append(var)
 
-	return current_list
+		return current_list
 
-current_listings = get_page_listings(req_url, req_data)
-
-description_urls = set()
-
-for url in current_listings:
-	description_urls.add(url[:(url[:-2].rfind('/')+1)])
-
-description_data = {}
-
-for url in description_urls:
-	key = url[url[:-2].rfind('/')+1:url.rfind('/')]
-	soup = BeautifulSoup(urllib2.urlopen(url).read())
-	value = ''
-	count = 0
-	for obj in soup.find_all('p', limit=3):
-		count = count + 1
-		if count == 3:
-			if obj.string == None:
-				pass
-			else:
-				value = value + unicode(obj.string)
-		else:
-			value = value + unicode(obj.string) + '<br>'
-	description_data[key] = value
-
-
-
-def crawl(listing_URL, origin, special, contact, desc_data):
-	soup = BeautifulSoup(urllib2.urlopen(listing_URL).read())
-	soupStrings = soup.find_all(text=True)
-
-	base = listing_URL[:(listing_URL[:-2].rfind('/')+1)]
-	key = base[base[:-2].rfind('/')+1:base.rfind('/')]
-
-	spans = soup.find_all("span")
-	strings = []
-	petloc = -1
-
-	for item in spans:
-		try:
-			if item["class"] == ["value"]:
-				value = unicode(item.string)
-				strings.append(value[:-1])
-				if 'Pet' in value:
-					petloc = strings.index(value[:-1])
-		except KeyError:
-			pass
-
-	data = {
-		'available' : strings[0],
-		'address' : strings[1],
-		'cost' : int(strings[3].replace('$','')), 
-		'pet' : strings[petloc],
-		'size' : int(strings[11]),
-		'bed' : int(strings[4]),
-		'bath' : int(strings[5])
-	}
-
-
-	jsonDoc = {}
-	jsonDoc["URL"] = listing_URL
-	jsonDoc["origin"] = origin
-	jsonDoc["title"] = str(soup.find("h1",class_="property-title entry-title").string).strip()
-
-	#get rental cost as integer, removing comma if present in value
-	if data['cost'] == 0:
-		return {"URL": listing_URL, "origin": origin}
-	jsonDoc["cost"] = data['cost']
-
-	# number of days between payments, 30 = monthly, 7 = weekly etc
-	jsonDoc["costType"] = 30
-
-	#get listing location
-	jsonDoc["location"] = get_location(data['address'])
-
-
-	jsonDoc["description"] = desc_data[key]
-
-	jsonDoc["type"] = get_type(jsonDoc["description"])
-
-	#get list of images in listing
-	imageObject = soup.find_all("a", class_="highslide")
-	imageList = []
-	for link in imageObject:
-		imageList.append(link.get('href'))
-	if imageList == []:
-		imageList.append("/static/house.png")
-#	jsonDoc["images"] = imageList
-
-#	jsonDoc["amenities"] = 
-
-	#get square footage as an integer (0 = unspecified)
-	jsonDoc["sizeSQF"] = data["size"]
-
-	#get int for bedrooms and bathrooms * NOTE THIS WILL NOT WORK IF THERE ARE MORE THAN 9 BEDROOMS OR BATHROOMS
-	jsonDoc["bedrooms"] = data["bed"]
-	jsonDoc["bathrooms"] = data["bath"]
-
-	#get available date as a string
-	jsonDoc["available"] = data['available']
-
-	#get application fee as an int
-	jsonDoc["appFee"] = 35
-
-	#get security deposit as an integer, must remove comma from value to create integer
-	try:
-		secDepLoc = soupStrings.index('Security Deposit:')
-		secDep = soupStrings[secDepLoc+1].strip()
-		securityDeposit = int(secDep[1:].replace(',',''))
-	except ValueError:
-		securityDeposit = 0
-#	jsonDoc["secDeposit"] = securityDeposit
-
-	jsonDoc["pets"] = is_pet_ok(data['pet'], data['pet'])
-
-#	jsonDoc["lease"] = lease_type(jsonDoc["description"], jsonDoc["amenities"])
-
-	#Does this listing accept Section 8, HACSA
-#	jsonDoc["special"] = special
-
-#	jsonDoc["student"] = is_student(jsonDoc["description"], jsonDoc["title"])
-
-	jsonDoc["applyNow"] = "http://umbrellaproperties.com/apply-online/"
-
-	jsonDoc["contact"] = contact
-
-	return jsonDoc
-
-def update_crawl(collection, origin, special, contact, new_list):
+	new_list = get_page_listings(req_url, req_data)
 	currentDB = collection.find({"origin":origin},{"URL":1})
-	crawlList = copy.copy(new_list) ##going to crawl crawlList after it has been modified
+	crawl_list = copy.copy(new_list) ##going to crawl crawl_list after it has been modified
 
 	newCount = 0
 	removeCount = 0
@@ -167,7 +49,7 @@ def update_crawl(collection, origin, special, contact, new_list):
 
 	for each_link in new_list: # Remove Listings from new list to crawl that I already have in the DB
 		if {"URL":each_link} in current_DB:
-			crawlList.delete_one(each_link)
+			crawl_list.delete_one(each_link)
 
 	for listing in current_DB: # Removes Listings from DB that are not currently listed on Chinook's Website
 		if listing["URL"] in new_list:
@@ -176,15 +58,160 @@ def update_crawl(collection, origin, special, contact, new_list):
 			removeCount = removeCount + 1
 			collection.delete_one({"URL": listing["URL"]})
 
-	# af_crawl(listing_URL, origin, special, contact):
-	# May want to use insert_many() **new in mongo 3.0....
-	for link in crawlList:
+	description_urls = set()
+
+	for url in crawl_list:
+		description_urls.add(url[:(url[:-2].rfind('/')+1)])
+
+	description_data = {}
+
+	for url in description_urls:
+		key = url[url[:-2].rfind('/')+1:url.rfind('/')]
+		soup = BeautifulSoup(urllib2.urlopen(url).read())
+		value = ''
+		count = 0
+		amenities = []
+
 		try:
-			INSERTME = crawl(link, origin, special, contact)
+			div = soup.find('div', class_="property_feature_list")
+			for obj in div.find_all('li'):
+				amenities.append(unicode(obj.string))
+			for obj in soup.find_all('p', limit=3):
+				count = count + 1
+				if count == 3:
+					if obj.string == None:
+						pass
+					else:
+						value = value + unicode(obj.string)
+				else:
+					value = value + unicode(obj.string) + '<br>'
+		except AttributeError:
+			amenities = []
+			value = ''
+
+		description_data[key] = {'description' : value, 'amenities': amenities}
+
+
+
+
+	def crawl(listing_URL, origin, special, contact, desc_data):
+		try:
+			soup = BeautifulSoup(urllib2.urlopen(listing_URL).read())
+			soupStrings = soup.find_all(text=True)
+
+			base = listing_URL[:(listing_URL[:-2].rfind('/')+1)]
+			key = base[base[:-2].rfind('/')+1:base.rfind('/')]
+
+			property_stats = soup.find('ul', id="property_stats")	
+
+			jsonDoc = {}
+			jsonDoc["URL"] = listing_URL
+			jsonDoc["origin"] = origin
+			jsonDoc["title"] = str(soup.find("h1",class_="property-title entry-title").string).strip()
+
+			#get rental cost as integer, removing comma if present in value
+			price = unicode(property_stats.find('li', class_="property_price").find('span', class_="value").string.strip().replace("$", ""))
+			if price == None:
+				return {"URL": listing_URL, "origin": origin}
+			jsonDoc["cost"] = int(price)
+
+			# number of days between payments, 30 = monthly, 7 = weekly etc
+			jsonDoc["costType"] = 30
+
+			#get listing location
+			jsonDoc["location"] = get_location(unicode(property_stats.find('li', class_="wpp_stat_plain_list_location").find('span', class_="value").string.strip()))
+
+
+			jsonDoc["description"] = description_data[key]['description']
+
+			jsonDoc["type"] = get_type(jsonDoc["description"])
+
+			#get list of images in listing
+			imageList = []
+			img_div = soup.find('div', class_="ngg-galleryoverview")
+			for obj in img_div.find_all('a'):
+				imageList.append(unicode(obj.get('href')))
+			if imageList == []:
+				imageList.append("/static/house.png")
+			jsonDoc["images"] = imageList
+		 
+
+			jsonDoc["amenities"] = description_data[key]['amenities']
+
+			#get square footage as an integer (0 = unspecified)
+			size_string = unicode(property_stats.find('li', class_="property_square_feet").find('span', class_="value").string.strip())
+			try:
+				the_size = int(size_string)
+			except ValueError:
+				the_size = 0
+			jsonDoc["sizeSQF"] = the_size
+
+			#get int for bedrooms and bathrooms
+			bed_string = unicode(property_stats.find('li', class_="property_bedrooms").find('span', class_="value").string.strip())
+			try:
+				beds = int(bed_string)
+			except ValueError:
+				beds = 1
+			jsonDoc["bedrooms"] = beds
+			bath_string = unicode(property_stats.find('li', class_="property_bathrooms").find('span', class_="value").string.strip())
+			try:
+				baths = int(bath_string)
+			except ValueError:
+				baths = 1
+			jsonDoc["bathrooms"] = baths
+
+			#get available date as a string
+			jsonDoc["available"] = unicode(property_stats.find('li', class_="wpp_stat_plain_list_date_open").find('span', class_="value").string.strip())
+
+			#get application fee as an int
+			jsonDoc["appFee"] = 35
+
+			#get security deposit as an integer, 0 = Unspecified
+			deposit_string = unicode(property_stats.find('li', class_="property_deposit").find('span', class_="value").string.strip())
+			try:
+				deposit = int(deposit_string)
+			except ValueError:
+				deposit = 0
+			jsonDoc["secDeposit"] = 0
+
+			pet_string = unicode(property_stats.find('li', class_="property_pet_policy").find('span', class_="value").string.strip())
+			jsonDoc["pets"] = is_pet_ok(pet_string, pet_string)
+
+			lease_string = unicode(property_stats.find('li', class_="property_lease_terms").find('span', class_="value").string.strip())
+			jsonDoc["lease"] = lease_type(jsonDoc["description"], lease_string)
+
+			#Does this listing accept Section 8, HACSA
+			jsonDoc["special"] = special
+
+			jsonDoc["student"] = is_student(jsonDoc["description"], jsonDoc["title"])
+
+			jsonDoc["applyNow"] = "http://umbrellaproperties.com/apply-online/"
+
+			jsonDoc["contact"] = contact
+
+			return jsonDoc
+		except:
+			print listing_URL
+			raise
+
+	# crawl(listing_URL, origin, special, contact, desc_data)
+	# May want to use insert_many() **new in mongo 3.0....
+	for link in crawl_list:
+		try:
+			INSERTME = crawl(link, origin, special, contact, description_data) 
 			collection.insert_one(INSERTME)
 			newCount = newCount + 1
 		except pymongo.errors.DuplicateKeyError:
+			print link
 			pass
 
 	print str(newCount) + " added to database for " + origin
 	print str(removeCount) + " removed from database for " + origin
+
+
+
+
+
+
+
+

@@ -12,6 +12,7 @@ from fullhousePM import full_house_pm
 from trioPM import trio_pm
 from mallardPM import mallard_pm
 from preferrednwPM import preferred_nw_pm
+from umbrellaPM import umbrella_pm
 
 acorn_pm()
 bell_pm()
@@ -28,3 +29,4 @@ preferred_nw_pm()
 premier_pm()
 principle_pm()
 trio_pm()
+umbrella_pm()
