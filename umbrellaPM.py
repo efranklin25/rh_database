@@ -5,11 +5,13 @@ import pymongo
 import json
 from serverConfig import collection
 import copy
-
-req_url = "http://umbrellaproperties.com/wordpress/wp-admin/admin-ajax.php"
-req_data = "action=wpp_property_overview_pagination&%5Bpagination%5B=off&wpp_ajax_query%5Bquery%5D%5Bproperty_type%5D=floorplan&wpp_ajax_query%5Bthumbnail_size%5D=thumbnail"
+import sys
 
 def umbrella_pm():
+
+	req_url = "http://umbrellaproperties.com/wordpress/wp-admin/admin-ajax.php"
+	req_data = "action=wpp_property_overview_pagination&%5Bpagination%5B=off&wpp_ajax_query%5Bquery%5D%5Bproperty_type%5D=floorplan&wpp_ajax_query%5Bthumbnail_size%5D=thumbnail"
+
 	origin = "umbrellaPM"
 	special = {"section8" : False, "hacsa" : False}
 	contact = {
@@ -36,27 +38,26 @@ def umbrella_pm():
 
 		return current_list
 
-	new_list = get_page_listings(req_url, req_data)
-	currentDB = collection.find({"origin":origin},{"URL":1})
-	crawl_list = copy.copy(new_list) ##going to crawl crawl_list after it has been modified
+	current_list = get_page_listings(req_url, req_data) #list of listing urls that are currently posted on the PM's website
+	current_DB_list_cursor = collection.find({"origin":origin},{"URL":1}) #cursor for list of dictionaries, where each dict contains the url and object ID for that listing in the DB
+	crawl_list = copy.copy(current_list) #list to crawl after it has been modified with only the listings we do not have
 
 	newCount = 0
 	removeCount = 0
 
-	current_DB = []
-	for item in currentDB:
-		current_DB.append(item)
+	current_DB_list = [] #actual list of dict's, where each dict contains the url and obj ID for that listing
 
-	for each_link in new_list: # Remove Listings from new list to crawl that I already have in the DB
-		if {"URL":each_link} in current_DB:
-			crawl_list.delete_one(each_link)
+	for obj in current_DB_list_cursor: 
+		current_DB_list.append(obj)
+		if obj["URL"] in crawl_list:
+			crawl_list.remove(obj["URL"]) #for each listingin the DB, if it's in the crawl_list too, then remove it
 
-	for listing in current_DB: # Removes Listings from DB that are not currently listed on Chinook's Website
-		if listing["URL"] in new_list:
+	for listing_obj in current_DB_list: # Removes Listings from DB that are not currently listed on Chinook's Website
+		if listing_obj["URL"] in current_list:
 			pass
 		else:
 			removeCount = removeCount + 1
-			collection.delete_one({"URL": listing["URL"]})
+			collection.delete_many({"URL": listing_obj["URL"]}) #using delete_many just to make sure any duplicates are deleted
 
 	description_urls = set()
 
@@ -201,8 +202,9 @@ def umbrella_pm():
 			INSERTME = crawl(link, origin, special, contact, description_data) 
 			collection.insert_one(INSERTME)
 			newCount = newCount + 1
-		except pymongo.errors.DuplicateKeyError:
-			print link
+		except:
+			print link + "did not work because..."
+			print sys.exc_info()
 			pass
 
 	print str(newCount) + " added to database for " + origin
