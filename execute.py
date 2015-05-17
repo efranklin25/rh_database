@@ -13,10 +13,13 @@ from trioPM import trio_pm
 from mallardPM import mallard_pm
 from preferrednwPM import preferred_nw_pm
 from umbrellaPM import umbrella_pm
+from campusconnectionPM import campusconnection_pm
+from valleyinvestmentPM import valleyinvestment_pm
 
 acorn_pm()
 bell_pm()
 bell_campus_pm()
+campusconnection_pm()
 chinook_pm()
 emerald_pm()
 full_house_pm()
@@ -30,3 +33,4 @@ premier_pm()
 principle_pm()
 trio_pm()
 umbrella_pm()
+valleyinvestment_pm()

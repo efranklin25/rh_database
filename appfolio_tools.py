@@ -44,7 +44,7 @@ def af_crawl(listing_URL, origin, special, contact):
 		else:
 			costInt = 0
 	if costInt == 0:
-		return {"URL": listing_URL, "origin": origin}
+		return None
 	jsonDoc["cost"] = costInt
 
 	# number of days between payments, 30 = monthly, 7 = weekly etc
